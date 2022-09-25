@@ -1,0 +1,4 @@
+CBreak is copyright (C) Luke Lenhart.
+
+CBreak uses the Apache 2.0 License (https://www.apache.org/licenses/LICENSE-2.0, SPDX-License-Identifier: Apache-2.0) with the following exceptions:
+* Redistribution in object form of CBreak itself or code produced by it need not comply with sections 4a, 4b, or 4d.

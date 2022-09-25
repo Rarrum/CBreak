@@ -1,0 +1,609 @@
+\documentclass{article}
+
+\usepackage[margin=0.5in]{geometry}
+\usepackage{xcolor}
+\usepackage[parfill]{parskip}
+\usepackage{syntax}
+\usepackage{framed}
+\usepackage{verbatim}
+
+%Fixes some weird font issues:
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+%Some shortcuts
+\definecolor{light-gray}{gray}{0.95}
+\newcommand{\code}[1]{\colorbox{light-gray}{\texttt{#1}}}
+
+\definecolor{shadecolor}{rgb}{.9, .9, .9}
+\newenvironment{codebox} {\snugshade\verbatim} {\endverbatim\endsnugshade}
+
+\newcommand{\breakingparagraph}[1]{\paragraph{#1}\mbox{}\medbreak}
+
+
+\title{CBreak 0 Language Specification}
+\date{}
+\author{Luke Lenhart}
+
+
+\begin{document}
+\maketitle
+DRAFT
+
+CBreak is language in the C family designed to have controlled periodic breaking changes such that it can evolve as times change.  It is inspired by C++, though not source compatible with C or C++.
+\medbreak
+Language goals:
+\begin{itemize}
+ \item Embrace breaking changes:
+  \begin{itemize}
+    \item If we learn a better way of doing something we can do it.
+    \item We can remove ``old ways of doing things'' to keep the language simple.
+  \end{itemize}
+  \item Control breaking changes:
+  \begin{itemize}
+    \item Breaking changes are only released infrequently.
+    \item Follow the spirit of semantic versioning to make compatibility understandable.
+    \item If possible keep ``N minus 1'' compatibility, for ease of transitions forward.
+  \end{itemize}
+  \item Clarity of naming:
+  \begin{itemize}
+    \item No ambiguity over what an identifier refers to.
+    \item No identifier names are reserved; all keywords are prefixed with a symbol.
+  \end{itemize}
+  \item Familiarity:
+  \begin{itemize}
+    \item Someone fluent in C++ should be able to read CBreak.
+    \item General design philosophy should follow C++ \textit{(``Don't pay for what you don't use.'', etc)}.
+  \end{itemize}
+\end{itemize}
+\newpage
+
+
+\tableofcontents
+\newpage
+
+
+\section{Language Representation}
+
+\subsection{Encoding}
+CBreak source code is comprised ASCII characters, classified as follows:
+
+\breakingparagraph{Alphabetic}
+\code{A} \textit{(65)} through \code{Z} \textit{(90)} or \code{a} \textit{(97)} through \code{z} \textit{(122)}.
+
+\breakingparagraph{Numeric}
+\code{0} \textit{(48)} through \code{9} \textit{(57)}.
+
+\breakingparagraph{Whitespace}
+Space \textit{(32)}, tab \textit{(9)}, line feed \textit{(10)}, or cairrage return \textit{(13)}.
+
+\breakingparagraph{Alphanumeric}
+For convience, we'll define this to mean \code{alphabetic}, \code{numeric}, or the underscore character \textit{(95)}.
+
+\breakingparagraph{Symbolic}
+Any ASCII character value 33 through 127 that is not \code{alphanumeric} and not the double quotation character \textit{(34)}.
+
+\breakingparagraph{StringIndicator}
+The double quotation character \textit{(34)}.
+
+\newpage
+
+
+\subsection{Language Tokens}
+A valid CBreak program can be thought of as a sequence of tokens.  These tokens do not correspond directly language features, but are instead used as a foundation for defining language features in the following sections.  \code{whitespace} has no bearing on interpretation of the language other than being a mechanism to separate tokens.
+
+There are 4 types of tokens in a CBreak program: \code{terms}, \code{comments}, \code{symbols}, and \code{literals}.
+
+\breakingparagraph{Term}
+An \code{term} begins with an \code{alphabetic} character, underscore, or \code{\#} symbol.  It then continues for all subsequent \code{alphanumeric} characters.
+
+Terms are used to represent most ``human language'' parts of the code.
+
+\breakingparagraph{Comment}
+A \code{single line comment} begins with consecutive \code{//} characters and continues until a line feed character or the end of the document.
+
+A \code{multiline comment} begins with consecutive \code{/*} characters and continues until the consecutive characters \code{*/} are encountered.  A multiline comment may be nested inside of another multiline comment, in which case the comment does not end until the characters corresponding to the first comment are encountered, as if the inner comment did not exist.
+
+Comments exist for human reference, and have no functional impact on anything.  A comment should be treated as \code{whitespace} for purposes of interpreting a document; the \code{symbolic} characters used to begin and end comments are not interpreted as \code{symbol} tokens.
+
+\breakingparagraph{Symbol}
+A \code{symbol} is comprised of a single \code{symbolic} character.
+
+\breakingparagraph{Literal}
+Literals represent known-at-compile-time values directly specified in source code.
+
+A \code{numeric literal} begins with a \code{numeric} character and continuous for all subsequent \code{alphabetic}, \code{numeric}, or period \textit{(46)} characters.  It may only contain a single period character, and may not end in a period character.  This is intended to represent various number formats.
+
+A \code{string literal} begins with a double quotation character and continues until the next double quotation character is encountered.  It may only contain characters values 32 through 127 or tab \textit{(this excludes things like line breaks)}.  This represents a sequence of 8-bit integer values.  There is no implicit null terminating character as in C.  TODO: escape sequences?
+
+\newpage
+
+
+\section{Language Features}
+
+\subsection{Additional Definitions}
+\breakingparagraph{Identifier}
+An identifier is a \code{term} that refers to the name of something.
+
+Identifiers that are a declaration are not decorated with namespace qualifiers.  TODO: Do we even want namespaces declarations?  What if the module name implicitely defined what namespace things were in?
+
+Identifiers that refer to declarations start must use a namespace qualifier: Identifiers with \code{:} to refer to something in the current namespace.  An identifier starts with \code{::} to refer something not in any namespace.  In the context of a function in a class, an identifier starts with the symbol \code{.} to refer to a member of the current class.  An identifier may be made up of multiple terms separated by \code{::} to refer to things nested in a particular namespace.  If an identifier is not prefixed with a symbol, it refers to a local variable or function argument.  These rules guarantee that there is no ambiguity over what an identifier refers to.
+
+Example: A global variable named CatCount in no namespace would be declared \code{int32 CatCount;} and referred to as \code{::CatCount}.
+
+Example: A variable in the namespace Cats named Count would be declared \code{namespace Cats \{ int32 Count; \}}.  Within a global function declared directly in the Cats namespace, it may be referred to as \code{:Count}.  From outside that namespace it would be referred to as \code{Cats::Count}.
+
+\breakingparagraph{Keyword}
+A keyword is a \code{term} prefixed with the symbol \code{\#} that has special meaning in the language.
+
+Examples: \#if, \#for, and \#namespace.
+
+\breakingparagraph{Scope}
+A scope begins with a \code{\{} symbol and ends with a \code{\}} symbol.  Depending on the context, a scope may potentially contain code that defines a nestde scope.  TODO: more stuff.
+
+\subsection{Namespaces}
+A namespace can be thought of as a prefix to all identifiers defined inside of it.  Its purpose is to allow code from different authors to be used together, when identifiers in both code bases have the same name.
+
+It is declared using the \code{namespace} \code{keyword}, followed by an identifier and \code{scope}:
+
+\code{namespace} \syntax{Identifier} \code{\{} \textit{...other code...} \code{\}}
+
+TODO: Perhaps the namespace of code should implicity just be the name of the module it lives in?
+
+\subsection{Built-In Types}
+Built-in types are considered keywords, and hence always prefixed with \code{\#}.
+
+\breakingparagraph{Two's compliment numbers}
+
+\begin{tabular}{ |c|c|c| }
+  \hline
+  & Unsigned & Signed\\\hline
+  8-bit & \texttt{uint8} & \texttt{int8}\\\hline
+  16-bit & \texttt{uint16} & \texttt{int16}\\\hline
+  32-bit & \texttt{uint32} & \texttt{int32}\\\hline
+  64-bit & \texttt{uint64} & \texttt{int64}\\\hline
+\end{tabular}
+
+\code{\#int} and \code{\#uint} are simple aliases for one of the types above, based on the module configuration.
+
+
+\breakingparagraph{Logic numbers}
+
+\code{\#bool} is conceptually a 1-bit integer, having values of either 0 or 1.  The \code{\#false} and \code{\#true} keywords are aliases for the constants 0 and 1 whose type is \code{\#bool}.
+
+TODO: rules around backing storage?  8-bit?
+
+\breakingparagraph{Floating point numbers}
+
+The \code{\#float16}, \code{\#float32}, \code{\#float64}, and \code{\#float128} types are standard ieee floating point numbers, with 16, 32, or 64 bits respectively.
+
+\code{\#float} is a simple alias for one of the types above, based on the module configuration.
+
+\breakingparagraph{TODO others}
+
+TODO: vector types?  Maybe every type is really a vector type, with the vanilla ones just being vectors of length 1?
+
+TODO: array?
+
+TODO: some sort of 8-bit integer array for strings?
+
+\subsection{Literals}
+
+Numeric literals have 1-2 implicit types that are the minimum size needed to represent it, for use in contexts where this would satisfy the type of an expression.  Numbers may be preceeded by the \code{-} symbol to denote a signed negative number.  Numbers without a negative prefix may be treated as either signed or unsigned as needed to satisfy the expression they are used in.  Following the optional negative prefix, the following representations are valid:
+
+Base 1 integer: Prefix \code{0b} followed by digits \code{0} through \code{1}
+
+Base 10 integer: Digits \code{0} through \code{9}
+
+Base 16 integer: Prefix \code{0x} followed by digits \code{0} through \code{9} and \code{A} through \code {F} \textit{(any case)}
+
+Examples: \code{-5} is always a signed 8-bit integer.  \code{140} may be either an unsigned 8-bit integer or a signed 16-bit integer.  \code{0b00001111} may be either an unsigned or signed 8-bit integer whose decimal value is 15.  \code{-0xCAA7} is always a signed 32-bit integer whose decimal value is -51879.  With the default value of 64-bit integers in module configuration, the expression \code{100 * 100} is performed by by multiplying two 64-bit unsigned integers, resulting in a 64-bit unsigned integer whose value is 10000.  TODO: I think we can resolve literal vs literal math at compile time so this becomes to 16-bit...
+
+TODO: floats
+
+TODO: strings?
+
+\subsection{Qualifiers}
+
+Qualifiers are \code{terms} placed before a declaration that modify the meaning in some way.
+
+\breakingparagraph{Functions and Variables}
+
+The \code{\#export} qualifier allows the identifier to be referred to from outside the current module.
+
+The \code{\#cextern("name")} qualifier indicates that the identifier refers to something that should be resolved by the linker using the C language identifier \code{name}.  Functions with this must have no body, and varables with this must have no initializer.
+
+\breakingparagraph{Classes, Functions, and Scopes}
+
+The \code{\#safe} qualifier indicates that additional precautions should be taken to reduce potential attack vectors.  Local variables will be zero-initialized at the start of the function in addition to their normal initialization time, and their stack memory will be reset to zero when the function exits.  TODO: Pointer alloc, or array bounds checks? Anything else?
+
+The \code{\#fast} qualifier indicates that no precautions should be token in favor of maximum performance.  Local variables without an initializer are not zero-initialized.  TODO: anything else?
+
+The \code{\#balanced} qualifier is the default, intended to be a sensible balance between \#safe and \#fast.  Local variables are zero-initialized at declaration time if they do not otherwise have an initializer.
+
+\breakingparagraph{Functions}
+
+The \code{\#cexport("name")} qualifier generates an undecorated function named \code{name} compatible with the C language, which calls the qualified function.
+
+TODO: C++ export for direct compatability?  With what though, since there's no standard ABI?
+
+TODO: C import
+
+\breakingparagraph{Expressions}
+
+The \code{\#copy} qualifier may prefixed to an identifier in an expression to indicate that the \#copy or \#autocopy special member function may be used to make the types compatible for an operation if they are not already compatible.  For example \code{\#var \#int32 = \#copy someUInt32;}.
+
+The \code{\#move} qualifier may prefixed to an identifier in an expression to indicate that the \#move special member function must be used to make the types compatible for an operation.  For example \code{\#var \#string str = \#move someOtherString;}.
+
+The \code{\#truncate} qualifier may prefixed to an identifier in an expression to indicate that the \#truncate special member function must be used to make the types compatible for an operation.  For example \code{\#var \#int16 = \#truncate someUInt32;}.
+
+The \code{\#transfer} qualifier may prefixed to an identifier in an expression to indicate that the \#move, \#copy, and \#truncate special member function may be considered (in that order) if needed in order to make the types compatible for an operation if they are not already compatible.  For example \code{\#var \#string str = \#transfer someOtherString;}.
+
+The \code{\#reinterpret} qualifier? TODO: Something about treating the underlying bytes for a value as if it were a completely different type.. maybe require them to be the same size at least?  For something like crabjamming the bits of a float into an int?  Or maybe some sort of union type is better for this?
+
+\subsection{Variables}
+Mutable variables are declared with the \code{\#var} keyword.  Mutable variables may have their values reassigned.
+
+Constant variables are declared with the \code{\#const} keyword.  Constant variables are only assigned on initialization and cannot be modified after that.  Function arguments are implicitely constant.
+
+Following their declaration keyword must be a \code{type} and a name for the variable.  That may optionally (required for constants) be followed by the \code{=} operator and then an expression that represents the value to initialize the variable with.  Variables that are not otherwise initialized are zero-initialized.
+
+The declaration must end with a \code{;} character.
+
+Unless an initial value is provided for a variable, it will be initialized to \code{0}.
+
+TODO: more details
+
+\subsection{Functions}
+
+Functions consist of zero or more return arguments, a name, then zero or more parameter arguments.  The \code{\#return} keyword signifies that a function is done executing.
+
+TODO: clean up the types for the returns once we have more formal pointer/reference syntax and stuff.
+
+Example of a function that accepts 2 arguments and returns 2 arguments:
+\begin{codebox}
+(#int32 ret1, #int32 ret2) MyMultiFunc(#int32 arg1, #int32 arg2)
+{
+    ret1 = arg1;
+    ret2 = arg2;
+    #return;
+}
+\end{codebox}
+
+TODO: Allow an alternate syntax: return x,y;?
+
+Example of a function that accepts 0 arguments and returns 0 arguments:
+\begin{codebox}
+() MyZeroFunc()
+{
+    ::DoSomething();
+    #return;
+}
+\end{codebox}
+
+Functions with a single return argument may be used in an expression.  For example:
+\begin{codebox}
+Something = MyFunc1() + 2 + MyFunc3(4);
+\end{codebox}
+
+Functions with more than one return argument may only be invoked as a standalone statement.  For example:
+\begin{codebox}
+#var #int32 a;
+#var #int32 b;
+(a, b) = MyMultiFunc(1, 2);
+\end{codebox}
+
+Each statement in a function body must end with a \code{;} character.
+
+Function names must be unique within their scope (there are no overloaded functions, or functions with the same name but different sets of parameters).
+
+TODO: more details
+
+\subsection{Coroutines}
+
+TODO
+
+\subsection{Classes}
+
+Classes are a way to group a related set of variables and functions.  Classes are declared using the \code{\#class} keyword.
+
+Within the function body of a class, \code{\#this} will refer to the instance of the class.
+
+The \code{.} binary operator is used to specificy which instance of a class a variable or function name refers to.
+
+TODO: more details
+
+\breakingparagraph{Special Member Functions}
+
+\textit{Note: These are an exception to there being no function overloads in the language.}
+
+\code{(Type arg) \#copy() const} - Copies the value of this class to another class.
+
+\code{(Type arg) \#autocopy() const} - Copies the values in this class to another class.  This function may be invoked automatically without the need for the \#copy identifier qualifier, which implies it is a cheap operation.  If this is defined, then \code{\#copy} may not be defined for the same type.
+
+\code{(Type arg) \#move()} - Moves the contents of this class to another class.  While this is allowed to be a copy, it is implied that this class will lose its state after this operation is complete.
+
+\code{(Type arg) \#truncate() const} - Copies an incomplete set of values from this class to another class.
+
+TODO: Do we also want copy_from, autocopy_from, move_from, and truncate_from?
+
+TODO: How to enable auto-generated copy/move/etc from another copy of the same class?
+
+\subsection{Expressions}
+
+All binary expressions, initializers, arguments to a function call, and return values require that both of the types involved are the same type (or convertible to that type).
+
+TODO: assignment operator
+
+TODO: general expression stuff.
+
+TODO: class assignment stuff.
+
+\subsection{Type Conversions}
+
+\breakingparagraph{Convert and Truncate}
+
+Any class or built-in type may optionally choose to provide \code{\#copy}, \code{\#autocopy}, \code{\#move}, or \code{\#truncate} special member functions as described in the Classes section above.
+
+\breakingparagraph{Integer and Float Types}
+
+Integers provide \#autocopy to all other integer types of the same signedness of the same or higher bits.  Integers also provide \#truncate for all other integers with a lower number of bits, even if they differ by signedness (TODO: should this be reinterpret?).  They provide \#copy for integers with the same number of bits but different signedness.
+
+Basic math between numeric literals is computed at compile-time without bit truncation, and the resulting type of that literal is based on the number of bits in the result.
+
+TODO: Conversions between int and float?  \#move on integers (and floats)?
+
+\subsection{Flow Control}
+
+CBreak supports if/else statements commonplace in many languages.  Example:
+\begin{codebox}
+#if (condition1)
+{
+    // code
+}
+#else #if (condition2)
+{
+    // code
+}
+#else
+{
+    // code
+}
+\end{codebox}
+
+TODO: details
+
+\subsection{Reference Types}
+
+TODO: 3 kinds of references: ``temp'' references that cannot be stored outside of the local scope, ``owning'' references that must be ``resolved'' in some way (stored or freed?), and ``anything'' references, with no restrictions.
+
+\subsection{Templates}
+
+There are two forms of templates, which provide a form of generic programming: \code{\#strict} and \code{\#loose}.  Both forms behave the same way in terms of code generation, the difference being purely whether type validity is checked at template declaration time vs at template usage time.  Either form may be applied to class or function declarations.
+
+Templates are declared using the \code{\#template} key word, preceeded with either the \code{\#strict} or \code{\#loose} keyword.  This is then followed by one or more \code{\#type} declarations, followed by the normal function/class code or a \code{\#capability} declaration.
+
+\code{\#loose} templates are the simplest.  The function or class may contain any code that makes use of any declared \code{\#type}, so long as a type is valid in that context.  No checks are performed on the result of accessing members of that type at declaration time.  Validity is checked later when the template is used in code with a concrete type.
+
+Example of \code{\#loose} templates:
+\begin{codebox}
+//function template
+#loose #template
+#type SomeType
+#type OtherType
+#int32 AddSizes(SomeType a, OtherType b)
+{
+    #return a.Size() + b.Size();
+}
+
+//class template
+#loose #template
+#type SomeType
+#class HolderOfThings
+{
+    SomeType Thing1;
+    SomeType Thing2;
+    
+    #int32 GetFirstThingySize()
+    {
+        #return Thing1.Size();
+    }
+}
+\end{codebox}
+
+A \code{\#capability} provides a set of member declarations that must provided by a class in order for that class to be used for a \code{\#type} in a \code{\#template} declaration.  This takes the form: \code{\#capability}, optionally followed by a \code{\#type} declaration as if for a \code{\#template}, then the name for the capability, followed by a \code{\{} character, then a list of member declarations (without bodies in the case of functions), then a closing \code{\}} character.
+
+Example of \code{\#capability}:
+\begin{codebox}
+//normal capability
+#capability CanMeasureSize
+{
+    #int32 Size();
+}
+
+//capability with template type
+#capability AccessIndex
+#type Element
+{
+    Element IndexOf(#int32 index);
+}
+\end{codebox}
+
+For \code{\#strict} templates, each \code{\#type} declaration must be followed by the \code{\#has} keyword, then a comma separated list of one or more declared \code{\#capability} names.  The class or function that uses the template types may only use members of the type that correspond to one of their declared capabilities.  Type usage is checked in the template class or function itself, rather than at the time the template is used with concrete types later.
+
+Example of a \code{\#strict} template:
+\begin{codebox}
+#strict #template
+#type SomeType #has CanMeasureSize
+#class HolderOfThings
+{
+    SomeType Thing1;
+    SomeType Thing2;
+    
+    #int32 Size()
+    {
+        #return Thing1.Size() + Thing2.Size();
+    }
+    
+// This would be invalid:
+//  #int32 GetSecondWeight()
+//  {
+//      #return Thing2.Weight();
+//  }
+}
+\end{codebox}
+
+When using a class that is a template, the type arguments are specified directly after the class name, as a comma-separated list encloded with \code{[ ]} brackets.  Example:
+\begin{codebox}
+#class Cat
+{
+    #int32 Size()
+    {
+        #return 13;
+    }
+}
+
+#int32 CountCats()
+{
+    HolderOfThings[Cat] holder;
+    #return holder.Size();
+}
+\end{codebox}
+
+Function templates work the same way.  Example:
+\begin{codebox}
+Cat cat1;
+Cat cat2;
+#int32 someSum = AddSizes[Cat, Cat](cat1, cat2);
+\end{codebox}
+
+Example of a function template inside of a class template:
+\begin{codebox}
+#loose #template
+#type TypeA
+#class SomeClass
+{
+    TypeA a;
+
+    #loose #template
+    #type TypeB
+    #int32 AddSizeTo(TypeB b)
+    {
+        #return a.Size() + b.Size();
+    }
+}
+\end{codebox}
+
+TODO: Can we automaticically figure out type arguments for functions without introducing ambiguity?
+
+TODO: Template value parameters, to enable things like fixed-size array and such.
+
+TODO: Can a normal class declaration optionally include something to state that it provides a \code{\#capability}, purely to reduce human error in creation of the class?
+
+TODO: Note about how we'll need to store the actual parsed language tokens in the module too, rather than IR, so types can be replaced in other modules correctly.
+
+TODO: Can loose templates also optionally include constraints?
+
+TODO: List of \code{\#capability} that are built-in.  \code{\#indexable} for array index syntax?
+
+\subsection{Exceptions}
+Any function may only throw a single exception type, which is transferred by value to the caller.  The caller must either catch, rethrow, or swallow it.
+
+TODO: details
+
+\newpage
+
+\section{Compilation Process}
+
+\subsection{Document Processing}
+
+TODO: Document organization.
+
+TODO: There is no preprocessor.  MIGHT consider a basic ifdef/else block.  Maybe have a qualifier that indicates conditions on which a class, function, or code block is present?  And have standard conditions like platform, cpu arch, etc?  While we're trying to avoid platform-specific code, we do need a way to get to the host OS eventually so we can abstract it away.
+
+Compiling a document is a two-step process: First the interfaces for everything addressable are collected (functions, classes, etc).  Then another pass is done to map everything referenced by the code implementations to the previously collected interfaces.  TODO: more
+
+\subsection{Modules}
+
+CBreak's basic unit of compilation is called a \code{module}.  A module is comprised of one or more \code{module fragments}, which are typically represented by individual source files.
+
+Global identifiers within a module are visible to everything else within that module \textit{(there is no concept of forward declarations)}.  Nothing is visible outside of the module, with the exception of identifiers qualified with \code{\#export} or \code{\#cexport}.
+
+A module fragment may optionally contain a \code{\#configuration} section in the global scope followed by enclosing by \code{\{\}} characters.  Within this section are a series of \code{name} \code{value} \code{;} statements, where value may be either a \code{numeric literal} or a \code{string literal}.  These values apply to the entire module.  Unless otherwise specified, each name may only be provided once:
+
+\begin{tabular}{ |c|c|p{10cm}|c| }
+  \hline
+  \textbf{Name} & \textbf{Type} & \textbf{Description} & \textbf{Default}\\\hline
+  \#ModuleName & string & This is the name of the module, used when importing it from other modules. & "Default"\\\hline
+  \#Import & string & Exposes exported identifiers from a particular module to this module.  This may be specified multiple times. & \\\hline
+  \#DefaultIntBits & numeric & This controls the number of bits in the \code{\#int} and \code{\#uint} types.  Valid value are: 8, 16, 32, 64, 128. & 64\\\hline
+  \#DefaultFloatBits & numeric & This controls the number of bits in the \code{\#float} type.  Valid value are: 16, 32, 64, 128.& 64\\\hline
+\end{tabular}
+
+TODO: I really don't like that \#Import is upper case, while \#export is lower case.. think about casing of stuff.. maybe make built-in identifiers case insensitive?
+
+\subsection{Compilation Phases}
+
+There are several different phases that CBreak code may pass through on its way to becoming executable code.  Depending on the developer's intentions, not all of these phases will be used for all projects.
+
+\breakingparagraph{Language Parser}
+
+This process transforms the CBreak document into a symbolic representation of that code.  That representation is not guaranteed to be a valid program.  For example, the symbolic representation might indicate that a function named \code{Foo} is defined, which returns no arguments and accepts one argument of type \code{SomeType} named \code{ArgName}.  There's no guarantee that \code{SomeType} has actually been defined somewhere.
+
+The output of this phase has several uses: Primarily, it will be used by subsquent phases of compilation process.  It could be used by various code analysis tools.  This representation could also be potentially be used for some form of run-type code generation that's beyond the scope of this document.  It could also assist fancy text editors in their formatting of the displayed language.  
+
+TODO: Also used for reflection?
+
+TODO: Somewhere we want to be able to apply forced run-time safety checks, such as for running code in a sandboxed environment, or to allow a novice user to executed code inside of another program, and have it fail gracefully.  Perhaps a pass here?  Or maybe part of the compiler's generated code instead?
+
+\breakingparagraph{Module Compiler}
+
+This phase transforms the symbolic representation from the Language Parser, and produces a compiled CBreak module.  The compiled CBreak module contains generated (platform-agnostic) code for everything in a particular module.  TODO: Maybe use LLVM IR... or WebAssembly?.  This gives as a platform-agnostic language that's ready to be turned into executable code for any supported platform.
+
+Another input to this phase (via imports in the module configuration) are other modules that have already been compiled.  This allows the generated IR to reference things exported by other modules.
+
+In addition to just IR code, definitions for user-defined classes are stored in the module.
+
+For exported templates, rather than IR code, we instead store the symbolic reprentation.  The module being compiled will apply its own types to this template as needed, and the resulting code will be stored internal to the module itself.
+
+TODO: think about dealing with the size of these things and offsets of their members, such that it's possible to change their size without breaking the ABI like in C, more like C\#?
+
+TODO: How modules are stored after compilation.  Perhaps json, with a section for the encoded binary IR, a section for exported templates, and a section for exported types?  Maybe zipped?
+
+\breakingparagraph{JIT Compiler}
+
+One use for CBreak modules is to compile them at run-time inside of another program, and execute code from them.
+
+\breakingparagraph{Platform Compiler}
+
+Another use for CBreak modules is to transform them into platform-specific object code, suitable for use with a C-compatible linker.
+
+\newpage
+
+\section{Standard Modules}
+
+CBreak defines a set of standard modules that provide a variety of commonly-used data structures and functionality.  Due to the wide range of supported platforms, not all modules are available on all platforms.  Some modules may be implemented differently on different platforms as well, though their exported interface will always be identical.
+
+\subsection{RawAlloc}
+
+This module provides simple C-style heap allocation.  Most programs won't use this directly; instead it is a foundation on which other safer data structures are built.
+
+TODO: interface.. essentially just malloc and free.
+
+\subsection{Resource}
+
+This module provides a common mechanism for managing the lifetime of a resource, be it memory, or some form of operating-system-specific handle.
+
+\subsection{Collections}
+
+This module provides a set of commonly-used data structures.
+
+TODO: FixedArray, DynArray, LinkedList, various hash sets and stuff...
+
+TODO: Think about common patterns to use across data structures.
+
+\end{document}
+
+\postsection{Legal Stuff}
+Copyright (c) Luke Lenhart.
+See LICENSE.txt for license details.

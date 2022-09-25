@@ -43,12 +43,12 @@ Language goals:
   \begin{itemize}
     \item Breaking changes are only released infrequently.
     \item Follow the spirit of semantic versioning to make compatibility understandable.
-    \item If possible keep ``N minus 1'' compatibility, for ease of transitions forward.
+    \item When reasonable keep ``N minus 1'' compatibility, for ease of transitions forward.
   \end{itemize}
   \item Clarity of naming:
   \begin{itemize}
-    \item No ambiguity over what an identifier refers to.
-    \item No identifier names are reserved; all keywords are prefixed with a symbol.
+    \item No ambiguity over what an identifier refers to; scope is always qualified.
+    \item No identifier names are reserved; all built-in keywords are prefixed with a symbol.
   \end{itemize}
   \item Familiarity:
   \begin{itemize}
@@ -260,6 +260,8 @@ Functions consist of zero or more return arguments, a name, then zero or more pa
 
 TODO: clean up the types for the returns once we have more formal pointer/reference syntax and stuff.
 
+TODO: how to signify passing by value vs by reference?
+
 Example of a function that accepts 2 arguments and returns 2 arguments:
 \begin{codebox}
 (#int32 ret1, #int32 ret2) MyMultiFunc(#int32 arg1, #int32 arg2)
@@ -311,9 +313,19 @@ Within the function body of a class, \code{\#this} will refer to the instance of
 
 The \code{.} binary operator is used to specificy which instance of a class a variable or function name refers to.
 
+Class members are accessible by all other code within the same module by default (with \#export exposing them outside of the module).  Variables or functions within classes may prefixed with the \code{\#private} qualifier to scope their visibility to within the class.  Variables within a class may be prefixed with the \code{\#observable} qualifier which causes them to be considered \#const when accessed outside of the class, but has no effect on their use within the class.
+
+NOTE: CBreak does not currently support inheritance for classes.
+
 TODO: more details
 
-\breakingparagraph{Special Member Functions}
+\breakingparagraph{Lifetime Management}
+
+The \code{\#default()} special member function may be declared to provide default member variable values upon instantiation.  Any member variable not assigned to by this method will have its own \code{\#default} called.  Decleration of this method is optional.  All member variables get their default values assigned if it's not declared.  TODO: interaction with \#export: If not exported callers outside the module cannot create?
+
+The \code{\#cleanup()} special member function may be declared to provide any special behaviour when a class is no longer used.  Declaration of this method is optional.  All member variables will have their \code{\#cleanup} method called after this method completes. TODO: implicitely \#export'd if anything in the class is exported?
+
+\breakingparagraph{Other Special Member Functions}
 
 \textit{Note: These are an exception to there being no function overloads in the language.}
 
@@ -371,7 +383,7 @@ CBreak supports if/else statements commonplace in many languages.  Example:
 }
 \end{codebox}
 
-TODO: details
+TODO: for and while loops
 
 \subsection{Reference Types}
 
@@ -511,6 +523,14 @@ Any function may only throw a single exception type, which is transferred by val
 
 TODO: details
 
+\subsection{Attributes}
+
+Attributes are additional qualifiers that can can be applied to classes and functions.
+
+TODO: syntax and other details
+
+TODO: A memory alignment attributes for classes.
+
 \newpage
 
 \section{Compilation Process}
@@ -582,25 +602,66 @@ Another use for CBreak modules is to transform them into platform-specific objec
 
 \section{Standard Modules}
 
-CBreak defines a set of standard modules that provide a variety of commonly-used data structures and functionality.  Due to the wide range of supported platforms, not all modules are available on all platforms.  Some modules may be implemented differently on different platforms as well, though their exported interface will always be identical.
+CBreak defines a set of built-in modules that provide a variety of commonly-used data structures and functionality.  Due to the wide range of supported platforms, not all modules are available on all platforms.  Some modules may be implemented differently on different platforms as well, though their exported interface will always be identical.
+
+TODO: namespace(s)?
 
 \subsection{RawAlloc}
 
-This module provides simple C-style heap allocation.  Most programs won't use this directly; instead it is a foundation on which other safer data structures are built.
+This module provides simple C-style memory allocation.  Most programs won't use this directly; instead it is a foundation on which other safer data structures are built.
 
-TODO: interface.. essentially just malloc and free.
+This module provides the built-in \code{\#rawpointer} type, which represents an arbitrary pointer to a location in memory.  The \code{\#rawpointer} type allows basic arithmatic operations on it, as if it were a regular integer.
 
-\subsection{Resource}
+\breakingparagraph{Provided Methods}
 
-This module provides a common mechanism for managing the lifetime of a resource, be it memory, or some form of operating-system-specific handle.
+\code{(\#rawpointer memory) \#RawMemoryAlloc (\#int size, \#int alignment)} - Allocates memory from the system.  Returns 0 on failure.
+
+\code{(\#rawpointer newMemory) \#RawMemoryRealloc (\#rawpointer oldMemory, \#int size, \#int alignment)} - Attempts to resize the memory located at oldMemory.  Upon success returns the new memory location.  Upon failure returns 0.
+
+\code{() \#RawMemoryFree(\#rawpointer memory)} - Returns memory back to the system.  Note that this does not call \#cleanup methods on any type located within the memory.
+
+TODO: A method to construct a particular type at a memory location.
+
+TODO: stack alloc?
 
 \subsection{Collections}
 
 This module provides a set of commonly-used data structures.
 
-TODO: FixedArray, DynArray, LinkedList, various hash sets and stuff...
+TODO: FixedArray, (FixedStackArray?), GrowArray, LinkedList, various hash sets and stuff...
+
+TODO: ``Checked'' variants, where every access is automatically bounds checked?  Failure behaviour?
+
+TODO: Fix up return types and such here once we've figured out references, for now using C++ notation.
 
 TODO: Think about common patterns to use across data structures.
+
+(NOTE: All members show below are \#export.)
+
+\breakingparagraph{Capabilities}
+
+These provided capabilities facilitate using common patterns across different data structures:
+
+TODO
+
+\breakingparagraph{FixedArray}
+
+Default state: Size=0
+
+\begin{codebox}
+#loose #template
+#type Element
+#class #FixedArray
+{
+    #observable #int Size;
+    Element& At(#int index);
+}
+\end{codebox}
+TODO: Figure out a common iterator/enumerator/ish pattern.
+
+This represents a non-resizable array of objects in adjacent memory.
+
+TODO: other types
 
 \end{document}
 
